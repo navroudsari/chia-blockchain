@@ -57,7 +57,7 @@ class TimelordAPI:
             if sp_iters > ip_iters:
                 self.timelord.overflow_blocks.append(new_unfinished_subblock)
             elif ip_iters > last_ip_iters:
-                new_block_iters: Optional[uint64] = self.timelord._can_infuse_unfinished_block(new_unfinished_subblock)
+                new_block_iters: Optional[uint64] = self.timelord.can_infuse_unfinished_block(new_unfinished_subblock)
                 if new_block_iters:
                     self.timelord.unfinished_blocks.append(new_unfinished_subblock)
                     for chain in [Chain.REWARD_CHAIN, Chain.CHALLENGE_CHAIN]:

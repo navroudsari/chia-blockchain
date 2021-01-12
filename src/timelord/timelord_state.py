@@ -45,8 +45,8 @@ class LastState:
         self.sub_slot_iters: uint64 = constants.SUB_SLOT_ITERS_STARTING
         self.reward_challenge_cache: List[Tuple[bytes32, uint128]] = [(constants.FIRST_RC_CHALLENGE, uint128(0))]
 
-    def set_state(self, state: Union[timelord_protocol.NewPeak, EndOfSubSlotBundle]):
-        if isinstance(state, timelord_protocol.NewPeak):
+    def set_state(self, state: Union[timelord_protocol.NewPeakTimelord, EndOfSubSlotBundle]):
+        if isinstance(state, timelord_protocol.NewPeakTimelord):
             self.state_type = StateType.PEAK
             self.peak = state
             self.subslot_end = None

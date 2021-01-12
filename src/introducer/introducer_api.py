@@ -1,7 +1,8 @@
 from typing import Optional, Callable
 
 from src.introducer.introducer import Introducer
-from src.server.outbound_message import Message
+from src.protocols.protocol_message_types import ProtocolMessageTypes
+from src.server.outbound_message import Message, make_msg
 from src.server.ws_connection import WSChiaConnection
 from src.types.peer_info import TimestampedPeerInfo
 from src.util.api_decorators import api_request, peer_required
@@ -51,5 +52,5 @@ class IntroducerAPI:
 
         self.introducer.log.info(f"Sending vetted {peers}")
 
-        msg = Message("respond_peers_introducer", RespondPeersIntroducer(peers))
+        msg = make_msg(ProtocolMessageTypes.respond_peers_introducer, RespondPeersIntroducer(peers))
         return msg

@@ -9,6 +9,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_runner import TCPSite
 from aiohttp import web, ClientTimeout, client_exceptions, ClientSession
 
+from src.protocols.protocol_message_types import ProtocolMessageTypes
 from src.server.introducer_peers import IntroducerPeers
 from src.server.outbound_message import NodeType, Message, Payload
 from src.server.ssl_context import load_ssl_paths
@@ -307,23 +308,20 @@ class ChiaServer:
             async def api_call(payload: Payload, connection: WSChiaConnection):
                 try:
                     full_message = payload.msg
+                    protocol_msg_type = ProtocolMessageTypes(full_message.type).name
                     connection.log.info(
-                        f"<- {full_message.function} from peer {connection.peer_node_id} {connection.peer_host}"
+                        f"<- {protocol_msg_type} from peer {connection.peer_node_id} {connection.peer_host}"
                     )
-                    if len(full_message.function) == 0 or full_message.function.startswith("_"):
-                        # This prevents remote calling of private methods that start with "_"
-                        self.log.error(f"Non existing function: {full_message.function}")
-                        raise ProtocolError(Err.INVALID_PROTOCOL_MESSAGE, [full_message.function])
 
-                    f = getattr(self.api, full_message.function, None)
+                    f = getattr(self.api, protocol_msg_type, None)
 
                     if f is None:
-                        self.log.error(f"Non existing function: {full_message.function}")
-                        raise ProtocolError(Err.INVALID_PROTOCOL_MESSAGE, [full_message.function])
+                        self.log.error(f"Non existing protocol message type: {protocol_msg_type}")
+                        raise ProtocolError(Err.INVALID_PROTOCOL_MESSAGE, [protocol_msg_type])
 
                     if not hasattr(f, "api_function"):
-                        self.log.error(f"Peer trying to call non api function {full_message.function}")
-                        raise ProtocolError(Err.INVALID_PROTOCOL_MESSAGE, [full_message.function])
+                        self.log.error(f"Peer trying to call non api function {protocol_msg_type}")
+                        raise ProtocolError(Err.INVALID_PROTOCOL_MESSAGE, [protocol_msg_type])
 
                     if hasattr(f, "peer_required"):
                         response: Optional[Message] = await f(full_message.data, connection)

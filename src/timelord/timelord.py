@@ -14,7 +14,8 @@ from src.consensus.pot_iterations import (
     is_overflow_sub_block,
 )
 from src.protocols import timelord_protocol
-from src.server.outbound_message import NodeType, Message
+from src.protocols.protocol_message_types import ProtocolMessageTypes
+from src.server.outbound_message import NodeType, make_msg
 from src.server.server import ChiaServer
 from src.timelord.iters_from_sub_block import iters_from_sub_block
 from src.timelord.timelord_state import LastState
@@ -62,7 +63,7 @@ class Timelord:
         # Last state received. Can either be a new peak or a new EndOfSubslotBundle.
         self.last_state: LastState = LastState(self.constants)
         # Unfinished block info, iters adjusted to the last peak.
-        self.unfinished_blocks: List[timelord_protocol.NewUnfinishedSubBlock] = []
+        self.unfinished_blocks: List[timelord_protocol.NewUnfinishedSubBlockTimelord] = []
         # Signage points iters, adjusted to the last peak.
         self.signage_point_iters: List[Tuple[uint64, uint8]] = []
         # For each chain, send those info when the process spawns.
@@ -73,7 +74,7 @@ class Timelord:
         # List of proofs finished.
         self.proofs_finished: List[Tuple[Chain, VDFInfo, VDFProof]] = []
         # Data to send at vdf_client initialization.
-        self.overflow_blocks: List[timelord_protocol.NewUnfinishedSubBlock] = []
+        self.overflow_blocks: List[timelord_protocol.NewUnfinishedSubBlockTimelord] = []
 
         self.process_communication_tasks: List[asyncio.Task] = []
         self.main_loop = None
@@ -142,7 +143,7 @@ class Timelord:
         except ConnectionResetError as e:
             log.error(f"{e}")
 
-    def _can_infuse_unfinished_block(self, block: timelord_protocol.NewUnfinishedSubBlock) -> Optional[uint64]:
+    def can_infuse_unfinished_block(self, block: timelord_protocol.NewUnfinishedSubBlockTimelord) -> Optional[uint64]:
         sub_slot_iters = self.last_state.get_sub_slot_iters()
         difficulty = self.last_state.get_difficulty()
         ip_iters = self.last_state.get_last_ip()
@@ -215,7 +216,7 @@ class Timelord:
             self.iters_submitted[chain] = []
         self.iteration_to_proof_type = {}
         for block in self.unfinished_blocks:
-            new_block_iters: Optional[uint64] = self._can_infuse_unfinished_block(block)
+            new_block_iters: Optional[uint64] = self.can_infuse_unfinished_block(block)
             if new_block_iters:
                 new_unfinished_blocks.append(block)
                 for chain in [Chain.REWARD_CHAIN, Chain.CHALLENGE_CHAIN]:
@@ -357,7 +358,7 @@ class Timelord:
                     rc_proof,
                 )
                 if self.server is not None:
-                    msg = Message("new_signage_point_vdf", response)
+                    msg = make_msg(ProtocolMessageTypes.new_signage_point_vdf, response)
                     await self.server.send_to_all([msg], NodeType.FULL_NODE)
                 # Cleanup the signage point from memory.
                 to_remove.append((signage_iter, signage_point_index))
@@ -459,7 +460,7 @@ class Timelord:
                         icc_info,
                         icc_proof,
                     )
-                    msg = Message("new_infusion_point_vdf", response)
+                    msg = make_msg(ProtocolMessageTypes.new_infusion_point_vdf, response)
                     if self.server is not None:
                         await self.server.send_to_all([msg], NodeType.FULL_NODE)
 
@@ -656,8 +657,8 @@ class Timelord:
                 SubSlotProofs(cc_proof, icc_ip_proof, rc_proof),
             )
             if self.server is not None:
-                msg = Message(
-                    "new_end_of_sub_slot_vdf",
+                msg = make_msg(
+                    ProtocolMessageTypes.new_end_of_sub_slot_vdf,
                     timelord_protocol.NewEndOfSubSlotVDF(eos_bundle),
                 )
                 await self.server.send_to_all([msg], NodeType.FULL_NODE)

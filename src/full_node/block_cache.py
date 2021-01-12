@@ -19,10 +19,14 @@ class BlockCache:
         self,
         sub_blocks: Dict[bytes32, SubBlockRecord],
         sub_height_to_hash: Dict[uint32, bytes32],
-        header_blocks: Dict[uint32, HeaderBlock] = {},
-        sub_epoch_summaries: Dict[uint32, SubEpochSummary] = {},
+        header_blocks=None,
+        sub_epoch_summaries=None,
         block_store: Optional[BlockStore] = None,
     ):
+        if sub_epoch_summaries is None:
+            sub_epoch_summaries = {}
+        if header_blocks is None:
+            header_blocks = {}
         self._sub_blocks = sub_blocks
         self._header_cache = header_blocks
         self._sub_height_to_hash = sub_height_to_hash
@@ -87,7 +91,7 @@ class BlockCache:
 
     async def init_headers(self, start: uint32, stop: uint32):
         if self.block_store is None:
-            self.log.debug("block store is None, dont init")
+            self.log.debug("block store is None, don't init")
             return
         self._header_cache = {}
         self.log.debug(f"init headers {start} {stop}")

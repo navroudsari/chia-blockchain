@@ -10,6 +10,7 @@ from blspy import PrivateKey
 
 from src.consensus.sub_block_record import SubBlockRecord
 from src.protocols.full_node_protocol import RequestProofOfWeight, RespondProofOfWeight
+from src.protocols.protocol_message_types import ProtocolMessageTypes
 from src.protocols.wallet_protocol import (
     RespondSubBlockHeader,
     RequestAdditions,
@@ -27,7 +28,7 @@ from src.util.byte_types import hexstr_to_bytes
 from src.protocols import wallet_protocol
 from src.consensus.constants import ConsensusConstants
 from src.server.server import ChiaServer
-from src.server.outbound_message import NodeType, Message
+from src.server.outbound_message import NodeType, Message, make_msg
 from src.server.node_discovery import WalletPeers
 from src.util.ints import uint32, uint128
 from src.types.sized_bytes import bytes32
@@ -217,7 +218,10 @@ class WalletNode:
             if action.name == "request_puzzle_solution":
                 coin_name = bytes32(hexstr_to_bytes(action_data["coin_name"]))
                 sub_height = uint32(action_data["sub_height"])
-                msg = Message("request_puzzle_solution", wallet_protocol.RequestPuzzleSolution(coin_name, sub_height))
+                msg = make_msg(
+                    ProtocolMessageTypes.request_puzzle_solution,
+                    wallet_protocol.RequestPuzzleSolution(coin_name, sub_height),
+                )
                 result.append(msg)
 
         return result
@@ -261,8 +265,8 @@ class WalletNode:
         for record in records:
             if record.spend_bundle is None:
                 continue
-            msg = Message(
-                "send_transaction",
+            msg = make_msg(
+                ProtocolMessageTypes.send_transaction,
                 wallet_protocol.SendTransaction(record.spend_bundle),
             )
             messages.append(msg)
@@ -504,7 +508,7 @@ class WalletNode:
 
         batch_size = self.constants.MAX_BLOCK_COUNT_PER_REQUESTS
         for i in range(max(0, fork_height - 1), peak_sub_height, batch_size):
-            start_height = i
+            start_height = uint32(i)
             end_height = min(peak_sub_height, start_height + batch_size)
             peers: List[WSChiaConnection] = self.server.get_full_node_connections()
             for peer in peers:
@@ -570,7 +574,7 @@ class WalletNode:
             # Verify root
             additions_merkle_set = MerkleSet()
 
-            # Addition Merkle set contains puzzlehash and hash of all coins with that puzzlehash
+            # Addition Merkle set contains puzzle hash and hash of all coins with that puzzle hash
             for puzzle_hash, coins_l in coins:
                 additions_merkle_set.add_already_hashed(puzzle_hash)
                 additions_merkle_set.add_already_hashed(hash_coin_list(coins_l))

@@ -209,8 +209,10 @@ class WSChiaConnection:
             attribute = getattr(class_for_type(self.connection_type), attr_name, None)
             if attribute is None:
                 raise AttributeError(f"bad attribute {attr_name}")
+            if not hasattr(ProtocolMessageTypes, attr_name):
+                raise AttributeError(f"{attr_name} is not a valid protocol message type")
 
-            msg = Message(attr_name, args[0])
+            msg = Message(getattr(ProtocolMessageTypes, attr_name), bytes(args[0]))
             result = await self.create_request(msg, 60)
             if result is not None:
                 ret_attr = getattr(class_for_type(self.local_type), result.function, None)
@@ -252,7 +254,8 @@ class WSChiaConnection:
         if payload.id in self.request_results:
             result_payload: Payload = self.request_results[payload.id]
             result = result_payload.msg
-            self.log.info(f"<- {result_payload.msg.function} from: {self.peer_host}:{self.peer_port}")
+            protocol_msg_type = ProtocolMessageTypes(result_payload.msg.type).name
+            self.log.info(f"<- {protocol_msg_type} from: {self.peer_host}:{self.peer_port}")
             self.request_results.pop(payload.id)
 
         return result
@@ -313,6 +316,10 @@ class WSChiaConnection:
                 return None
         elif message.type == WSMsgType.BINARY:
             data = message.data
+
+            # All incoming messages are parsed here, so they are guaranteed to conform to the Payload streamable type.
+            # Note that the actual protocol message is not parsed until the appropriate function call is performed,
+            # in the api_call method.
             full_message_loaded: Payload = Payload.from_bytes(message.data)
             self.bytes_read += len(data)
             self.last_message_time = time.time()

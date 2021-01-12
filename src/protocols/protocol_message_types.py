@@ -72,5 +72,8 @@ class ProtocolMessageTypes(Enum):
     respond_header_blocks = 57
 
     # Introducer protocol (introducer <-> full_node)
-    request_peers_introducer = 58
-    respond_peers_introducer = 59
+    request_peers_introducer = 250
+    respond_peers_introducer = 251
+
+    # Full node simulator protocol
+    farm_new_block = 252

@@ -1,5 +1,5 @@
 import time
-from typing import Callable
+from typing import Callable, Optional
 
 from blspy import AugSchemeMPL, G2Element
 import src.server.ws_connection as ws
@@ -10,7 +10,8 @@ from src.consensus.pot_iterations import (
 )
 from src.farmer.farmer import Farmer
 from src.protocols import harvester_protocol, farmer_protocol
-from src.server.outbound_message import Message, NodeType
+from src.protocols.protocol_message_types import ProtocolMessageTypes
+from src.server.outbound_message import NodeType, make_msg
 from src.types.pool_target import PoolTarget
 from src.types.proof_of_space import ProofOfSpace
 from src.util.api_decorators import api_request, peer_required
@@ -109,7 +110,7 @@ class FarmerAPI:
             )
             self.farmer.cache_add_time[computed_quality_string] = uint64(int(time.time()))
 
-            return Message("request_signatures", request)
+            return make_msg(ProtocolMessageTypes.request_signatures, request)
 
     @api_request
     async def respond_signatures(self, response: harvester_protocol.RespondSignatures):
@@ -131,17 +132,17 @@ class FarmerAPI:
         if found_sp_hash_debug:
             assert is_sp_signatures
 
-        pospace = None
+        proof_of_space: Optional[ProofOfSpace] = None
         for plot_identifier, candidate_pospace in self.farmer.proofs_of_space[response.sp_hash]:
             if plot_identifier == response.plot_identifier:
-                pospace = candidate_pospace
-        assert pospace is not None
+                proof_of_space = candidate_pospace
+        assert proof_of_space is not None
 
-        computed_quality_string = pospace.verify_and_get_quality_string(
+        computed_quality_string = proof_of_space.verify_and_get_quality_string(
             self.farmer.constants, response.challenge_hash, response.sp_hash
         )
         if computed_quality_string is None:
-            self.farmer.log.warning(f"Have invalid PoSpace {pospace}")
+            self.farmer.log.warning(f"Have invalid PoSpace {proof_of_space}")
             return
 
         if is_sp_signatures:
@@ -154,7 +155,7 @@ class FarmerAPI:
                 pk = sk.get_g1()
                 if pk == response.farmer_pk:
                     agg_pk = ProofOfSpace.generate_plot_public_key(response.local_pk, pk)
-                    assert agg_pk == pospace.plot_public_key
+                    assert agg_pk == proof_of_space.plot_public_key
                     farmer_share_cc_sp = AugSchemeMPL.sign(sk, challenge_chain_sp, agg_pk)
                     agg_sig_cc_sp = AugSchemeMPL.aggregate([challenge_chain_sp_harv_sig, farmer_share_cc_sp])
                     assert AugSchemeMPL.verify(agg_pk, challenge_chain_sp, agg_sig_cc_sp)
@@ -164,8 +165,8 @@ class FarmerAPI:
                     agg_sig_rc_sp = AugSchemeMPL.aggregate([reward_chain_sp_harv_sig, farmer_share_rc_sp])
                     assert AugSchemeMPL.verify(agg_pk, reward_chain_sp, agg_sig_rc_sp)
 
-                    assert pospace.pool_public_key is not None
-                    pool_pk = bytes(pospace.pool_public_key)
+                    assert proof_of_space.pool_public_key is not None
+                    pool_pk = bytes(proof_of_space.pool_public_key)
                     if pool_pk not in self.farmer.pool_sks_map:
                         self.farmer.log.error(
                             f"Don't have the private key for the pool key used by harvester: {pool_pk.hex()}"
@@ -180,7 +181,7 @@ class FarmerAPI:
                         challenge_chain_sp,
                         signage_point_index,
                         reward_chain_sp,
-                        pospace,
+                        proof_of_space,
                         agg_sig_cc_sp,
                         agg_sig_rc_sp,
                         self.farmer.wallet_target,
@@ -188,7 +189,7 @@ class FarmerAPI:
                         pool_target_signature,
                     )
 
-                    msg = Message("declare_proof_of_space", request)
+                    msg = make_msg(ProtocolMessageTypes.declare_proof_of_space, request)
                     await self.farmer.server.send_to_all([msg], NodeType.FULL_NODE)
                     return
 
@@ -206,7 +207,7 @@ class FarmerAPI:
                 pk = sk.get_g1()
                 if pk == response.farmer_pk:
                     agg_pk = ProofOfSpace.generate_plot_public_key(response.local_pk, pk)
-                    assert agg_pk == pospace.plot_public_key
+                    assert agg_pk == proof_of_space.plot_public_key
                     foliage_sub_block_sig_farmer = AugSchemeMPL.sign(sk, foliage_sub_block_hash, agg_pk)
                     foliage_block_sig_farmer = AugSchemeMPL.sign(sk, foliage_block_hash, agg_pk)
                     foliage_sub_block_agg_sig = AugSchemeMPL.aggregate(
@@ -224,7 +225,7 @@ class FarmerAPI:
                         foliage_block_agg_sig,
                     )
 
-                    msg = Message("signed_values", request_to_nodes)
+                    msg = make_msg(ProtocolMessageTypes.signed_values, request_to_nodes)
                     await self.farmer.server.send_to_all([msg], NodeType.FULL_NODE)
 
     """
@@ -241,7 +242,7 @@ class FarmerAPI:
             new_signage_point.challenge_chain_sp,
         )
 
-        msg = Message("new_signage_point_harvester", message)
+        msg = make_msg(ProtocolMessageTypes.new_signage_point_harvester, message)
         await self.farmer.server.send_to_all([msg], NodeType.HARVESTER)
         if new_signage_point.challenge_chain_sp not in self.farmer.sps:
             self.farmer.sps[new_signage_point.challenge_chain_sp] = []
@@ -265,5 +266,5 @@ class FarmerAPI:
             [full_node_request.foliage_sub_block_hash, full_node_request.foliage_block_hash],
         )
 
-        msg = Message("request_signatures", request)
+        msg = make_msg(ProtocolMessageTypes.request_signatures, request)
         await self.farmer.server.send_to_specific([msg], node_id)
