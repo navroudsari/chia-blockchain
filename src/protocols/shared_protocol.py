@@ -26,15 +26,3 @@ class Handshake(Streamable):
 @streamable
 class HandshakeAck(Streamable):
     pass
-
-
-@dataclass(frozen=True)
-@streamable
-class Ping(Streamable):
-    nonce: bytes32
-
-
-@dataclass(frozen=True)
-@streamable
-class Pong(Streamable):
-    nonce: bytes32

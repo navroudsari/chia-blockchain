@@ -20,7 +20,7 @@ Protocol between timelord and full node.
 
 @dataclass(frozen=True)
 @streamable
-class NewPeak(Streamable):
+class NewPeakTimelord(Streamable):
     reward_chain_sub_block: RewardChainSubBlock
     difficulty: uint64
     deficit: uint8
@@ -34,7 +34,7 @@ class NewPeak(Streamable):
 
 @dataclass(frozen=True)
 @streamable
-class NewUnfinishedSubBlock(Streamable):
+class NewUnfinishedSubBlockTimelord(Streamable):
     reward_chain_sub_block: RewardChainSubBlockUnfinished  # Reward chain trunk data
     difficulty: uint64
     sub_slot_iters: uint64  # SSi in the slot where block is infused

@@ -3,7 +3,7 @@ import dataclasses
 import time
 
 import src.server.ws_connection as ws
-from typing import AsyncGenerator, List, Optional, Tuple, Callable, Dict
+from typing import List, Optional, Tuple, Callable, Dict
 from chiabip158 import PyBIP158
 from blspy import G2Element, AugSchemeMPL
 
@@ -27,8 +27,8 @@ from src.protocols import (
     wallet_protocol,
 )
 from src.protocols.full_node_protocol import RejectSubBlocks
-from src.protocols.wallet_protocol import RejectHeaderRequest, PuzzleSolutionResponse
-from src.server.outbound_message import Message, NodeType, OutboundMessage
+from src.protocols.wallet_protocol import RejectHeaderRequest, PuzzleSolutionResponse, RejectHeaderBlocks
+from src.server.outbound_message import Message, NodeType
 from src.types.coin import Coin, hash_coin_list
 
 from src.types.end_of_slot_bundle import EndOfSubSlotBundle
@@ -47,8 +47,6 @@ from src.util.errors import Err
 from src.util.ints import uint64, uint128, uint8, uint32
 from src.types.peer_info import PeerInfo
 from src.util.merkle_set import MerkleSet
-
-OutboundMessageGenerator = AsyncGenerator[OutboundMessage, None]
 
 
 class FullNodeAPI:
@@ -81,12 +79,20 @@ class FullNodeAPI:
     @peer_required
     @api_request
     async def respond_peers(
-        self, request: introducer_protocol.RespondPeers, peer: ws.WSChiaConnection
+        self, request: full_node_protocol.RespondPeers, peer: ws.WSChiaConnection
     ) -> Optional[Message]:
         if self.full_node.full_node_peers is not None:
             await self.full_node.full_node_peers.respond_peers(request, peer.get_peer_info(), False)
-        if peer.connection_type is NodeType.INTRODUCER:
-            await peer.close()
+        return None
+
+    @peer_required
+    @api_request
+    async def respond_peers_introducer(
+        self, request: introducer_protocol.RespondPeersIntroducer, peer: ws.WSChiaConnection
+    ) -> Optional[Message]:
+        if self.full_node.full_node_peers is not None:
+            await self.full_node.full_node_peers.respond_peers(request, peer.get_peer_info(), False)
+        await peer.close()
         return None
 
     @peer_required
@@ -1027,3 +1033,32 @@ class FullNodeAPI:
         response = wallet_protocol.RespondPuzzleSolution(wrapper)
         response_msg = Message("respond_puzzle_solution", response)
         return response_msg
+
+    @api_request
+    async def request_header_blocks(self, request: wallet_protocol.RequestHeaderBlocks) -> Optional[Message]:
+        if request.end_sub_height < request.start_sub_height or request.end_sub_height - request.start_sub_height > 32:
+            return None
+        for i in range(request.start_sub_height, request.end_sub_height + 1):
+            if i not in self.full_node.blockchain.sub_height_to_hash:
+                reject = RejectHeaderBlocks(request.start_sub_height, request.end_sub_height)
+                msg = Message("reject_header_blocks_request", reject)
+                return msg
+
+        blocks: List[HeaderBlock] = []
+
+        for i in range(request.start_sub_height, request.end_sub_height + 1):
+            block: Optional[FullBlock] = await self.full_node.block_store.get_full_block(
+                self.full_node.blockchain.sub_height_to_hash[uint32(i)]
+            )
+            if block is None:
+                reject = RejectHeaderBlocks(request.start_sub_height, request.end_sub_height)
+                msg = Message("reject_header_blocks_request", reject)
+                return msg
+
+            blocks.append(await block.get_block_header())
+
+        msg = Message(
+            "respond_header_blocks",
+            wallet_protocol.RespondHeaderBlocks(request.start_sub_height, request.end_sub_height, blocks),
+        )
+        return msg

@@ -12,7 +12,6 @@ from src.server.server import ChiaServer
 from src.types.peer_info import PeerInfo, TimestampedPeerInfo
 from src.util.path import path_from_root, mkdir
 from src.server.outbound_message import (
-    OutboundMessage,
     Message,
     NodeType,
 )
@@ -26,8 +25,6 @@ from secrets import randbits
 from src.util.hash import std_hash
 from typing import Dict, Optional, AsyncGenerator
 from src.util.ints import uint64
-
-OutboundMessageGenerator = AsyncGenerator[OutboundMessage, None]
 
 
 class FullNodeDiscovery:
@@ -124,7 +121,7 @@ class FullNodeDiscovery:
             return
 
         async def on_connect(peer: ws.WSChiaConnection):
-            msg = Message("request_peers", introducer_protocol.RequestPeers())
+            msg = Message("request_peers_introducer", introducer_protocol.RequestPeersIntroducer())
             await peer.send_message(msg)
 
         await self.server.start_client(self.introducer_info, on_connect)

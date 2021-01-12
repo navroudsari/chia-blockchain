@@ -56,7 +56,7 @@ class Timelord:
         # Chains that currently accept iterations.
         self.allows_iters: List[Chain] = []
         # Last peak received, None if it's already processed.
-        self.new_peak: Optional[timelord_protocol.NewPeak] = None
+        self.new_peak: Optional[timelord_protocol.NewPeakTimelord] = None
         # Last end of subslot bundle, None if we built a peak on top of it.
         self.new_subslot_end: Optional[EndOfSubSlotBundle] = None
         # Last state received. Can either be a new peak or a new EndOfSubslotBundle.
@@ -542,7 +542,7 @@ class Timelord:
                     else:
                         new_sub_epoch_summary = block.sub_epoch_summary
 
-                    self.new_peak = timelord_protocol.NewPeak(
+                    self.new_peak = timelord_protocol.NewPeakTimelord(
                         new_reward_chain_sub_block,
                         block.difficulty,
                         new_deficit,

@@ -60,7 +60,7 @@ class TransactionAck(Streamable):
 
 @dataclass(frozen=True)
 @streamable
-class NewPeak(Streamable):
+class NewPeakWallet(Streamable):
     header_hash: bytes32
     sub_block_height: uint32
     weight: uint128
@@ -131,3 +131,25 @@ class RespondAdditions:
 class RejectAdditionsRequest:
     sub_height: uint32
     header_hash: bytes32
+
+
+@dataclass(frozen=True)
+@streamable
+class RequestHeaderBlocks:
+    start_sub_height: uint32
+    end_sub_height: uint32
+
+
+@dataclass(frozen=True)
+@streamable
+class RejectHeaderBlocks:
+    start_sub_height: uint32
+    end_sub_height: uint32
+
+
+@dataclass(frozen=True)
+@streamable
+class RespondHeaderBlocks:
+    start_sub_height: uint32
+    end_sub_height: uint32
+    header_blocks: List[HeaderBlock]

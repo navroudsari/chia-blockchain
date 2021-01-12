@@ -4,24 +4,23 @@ import asyncio
 import traceback
 from secrets import token_bytes
 
-from typing import Any, AsyncGenerator, Callable, Optional, List, Dict
+from typing import Any, Callable, Optional, List, Dict
 
 from aiohttp import WSMessage, WSMsgType
 
+from src.protocols.protocol_message_types import ProtocolMessageTypes
 from src.protocols.shared_protocol import Handshake
-from src.server.outbound_message import Message, NodeType, OutboundMessage, Payload
+from src.server.outbound_message import Message, NodeType, Payload, make_msg
 from src.types.peer_info import PeerInfo
 from src.types.sized_bytes import bytes32
-from src.util import cbor
 from src.util.ints import uint16
 from src.util.errors import Err, ProtocolError
 
 # Each message is prepended with LENGTH_BYTES bytes specifying the length
 from src.util.network import class_for_type
 
+# Max size 2^(8*4) which is around 4GiB
 LENGTH_BYTES: int = 4
-
-OnConnectFunc = Optional[Callable[[], AsyncGenerator[OutboundMessage, None]]]
 
 
 class WSChiaConnection:
@@ -91,8 +90,8 @@ class WSChiaConnection:
 
     async def perform_handshake(self, network_id, protocol_version, node_id, server_port, local_type):
         if self.is_outbound:
-            outbound_handshake = Message(
-                "handshake",
+            outbound_handshake = make_msg(
+                ProtocolMessageTypes.handshake,
                 Handshake(
                     network_id,
                     protocol_version,
@@ -104,8 +103,12 @@ class WSChiaConnection:
             payload = Payload(outbound_handshake, None)
             await self._send_message(payload)
             payload = await self._read_one_message()
-            inbound_handshake = Handshake(**payload.msg.data)
-            if payload.msg.function != "handshake" or not inbound_handshake or not inbound_handshake.node_type:
+            inbound_handshake = Handshake.from_bytes(payload.msg.data)
+            if (
+                payload.msg.type != ProtocolMessageTypes.handshake
+                or not inbound_handshake
+                or not inbound_handshake.node_type
+            ):
                 raise ProtocolError(Err.INVALID_HANDSHAKE)
             self.peer_node_id = inbound_handshake.node_id
             self.peer_server_port = int(inbound_handshake.server_port)
@@ -113,11 +116,15 @@ class WSChiaConnection:
 
         else:
             payload = await self._read_one_message()
-            inbound_handshake = Handshake(**payload.msg.data)
-            if payload.msg.function != "handshake" or not inbound_handshake or not inbound_handshake.node_type:
+            inbound_handshake = Handshake.from_bytes(payload.msg.data)
+            if (
+                payload.msg.type != ProtocolMessageTypes.handshake
+                or not inbound_handshake
+                or not inbound_handshake.node_type
+            ):
                 raise ProtocolError(Err.INVALID_HANDSHAKE)
-            outbound_handshake = Message(
-                "handshake",
+            outbound_handshake = make_msg(
+                ProtocolMessageTypes.handshake,
                 Handshake(
                     network_id,
                     protocol_version,
@@ -263,11 +270,11 @@ class WSChiaConnection:
             await self.outgoing_queue.put(payload)
 
     async def _send_message(self, payload: Payload):
-        encoded: bytes = cbor.dumps({"f": payload.msg.function, "d": payload.msg.data, "i": payload.id})
+        encoded: bytes = bytes(payload)
         size = len(encoded)
         assert len(encoded) < (2 ** (LENGTH_BYTES * 8))
         await self.ws.send_bytes(encoded)
-        self.log.info(f"-> {payload.msg.function} to peer {self.peer_host} {self.peer_node_id}")
+        self.log.info(f"-> {payload.msg.type} to peer {self.peer_host} {self.peer_node_id}")
         self.bytes_written += size
 
     async def _read_one_message(self) -> Optional[Payload]:
@@ -306,14 +313,10 @@ class WSChiaConnection:
                 return None
         elif message.type == WSMsgType.BINARY:
             data = message.data
-            full_message_loaded: Any = cbor.loads(data)
+            full_message_loaded: Payload = Payload.from_bytes(message.data)
             self.bytes_read += len(data)
             self.last_message_time = time.time()
-            assert len(full_message_loaded["f"]) < 256
-            msg = Message(full_message_loaded["f"], full_message_loaded["d"])
-            payload_id = full_message_loaded["i"]
-            payload = Payload(msg, payload_id)
-            return payload
+            return full_message_loaded
         else:
             self.log.error(f"Unexpected WebSocket message type: {message}")
             asyncio.create_task(self.close())

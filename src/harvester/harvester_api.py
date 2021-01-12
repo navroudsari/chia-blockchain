@@ -51,7 +51,9 @@ class HarvesterAPI:
 
     @peer_required
     @api_request
-    async def new_signage_point(self, new_challenge: harvester_protocol.NewSignagePoint, peer: WSChiaConnection):
+    async def new_signage_point_harvester(
+        self, new_challenge: harvester_protocol.NewSignagePointHarvester, peer: WSChiaConnection
+    ):
         """
         The harvester receives a new signage point from the farmer, this happens at the start of each slot.
         The harvester does a few things:
@@ -88,7 +90,11 @@ class HarvesterAPI:
                 quality_strings = plot_info.prover.get_qualities_for_challenge(sp_challenge_hash)
             except Exception as e:
                 self.harvester.log.error(f"Error using prover object. Reinitializing prover object. {e}")
-                self.harvester.provers[filename] = dataclasses.replace(plot_info, prover=DiskProver(str(filename)))
+                try:
+                    self.harvester.provers[filename] = dataclasses.replace(plot_info, prover=DiskProver(str(filename)))
+                except Exception as e:
+                    self.harvester.log.error(f"Error reinitializing. Will not try to farm plot. {e}")
+                    self.harvester.provers.pop(filename)
                 return []
 
             responses: List[Tuple[bytes32, ProofOfSpace]] = []

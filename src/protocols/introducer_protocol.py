@@ -11,7 +11,7 @@ Protocol to introducer
 
 @dataclass(frozen=True)
 @streamable
-class RequestPeers(Streamable):
+class RequestPeersIntroducer(Streamable):
     """
     Return full list of peers
     """
@@ -19,5 +19,5 @@ class RequestPeers(Streamable):
 
 @dataclass(frozen=True)
 @streamable
-class RespondPeers(Streamable):
+class RespondPeersIntroducer(Streamable):
     peer_list: List[TimestampedPeerInfo]

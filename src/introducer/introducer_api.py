@@ -6,7 +6,7 @@ from src.server.ws_connection import WSChiaConnection
 from src.types.peer_info import TimestampedPeerInfo
 from src.util.api_decorators import api_request, peer_required
 from src.util.ints import uint64
-from src.protocols.introducer_protocol import RespondPeers, RequestPeers
+from src.protocols.introducer_protocol import RespondPeersIntroducer, RequestPeersIntroducer
 
 
 class IntroducerAPI:
@@ -22,7 +22,7 @@ class IntroducerAPI:
     @api_request
     async def request_peers(
         self,
-        request: RequestPeers,
+        request: RequestPeersIntroducer,
         peer: WSChiaConnection,
     ) -> Optional[Message]:
         max_peers = self.introducer.max_peers_to_send
@@ -51,5 +51,5 @@ class IntroducerAPI:
 
         self.introducer.log.info(f"Sending vetted {peers}")
 
-        msg = Message("respond_peers", RespondPeers(peers))
+        msg = Message("respond_peers_introducer", RespondPeersIntroducer(peers))
         return msg

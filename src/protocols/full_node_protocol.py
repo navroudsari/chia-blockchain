@@ -71,6 +71,12 @@ class RequestSubBlock(Streamable):
 
 @dataclass(frozen=True)
 @streamable
+class RespondSubBlock(Streamable):
+    sub_block: FullBlock
+
+
+@dataclass(frozen=True)
+@streamable
 class RequestSubBlocks(Streamable):
     start_sub_height: uint32
     end_sub_height: uint32
@@ -90,12 +96,6 @@ class RespondSubBlocks(Streamable):
 class RejectSubBlocks(Streamable):
     start_sub_height: uint32
     end_sub_height: uint32
-
-
-@dataclass(frozen=True)
-@streamable
-class RespondSubBlock(Streamable):
-    sub_block: FullBlock
 
 
 @dataclass(frozen=True)
