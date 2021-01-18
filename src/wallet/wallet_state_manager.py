@@ -393,7 +393,7 @@ class WalletStateManager:
         Returns the balance amount of all coins that are spendable.
         """
         spendable: Set[WalletCoinRecord] = await self.get_spendable_coins_for_wallet(wallet_id)
-
+        self.log.info(f"spendable coins {spendable}")
         amount: uint64 = uint64(0)
 
         for record in spendable:
@@ -975,9 +975,11 @@ class WalletStateManager:
         valid_index = current_index
 
         records = await self.coin_store.get_spendable_for_index(valid_index, wallet_id)
+        self.log.info(f"records {records}")
 
         # Coins that are currently part of a transaction
         unconfirmed_tx: List[TransactionRecord] = await self.tx_store.get_unconfirmed_for_wallet(wallet_id)
+        self.log.info(f"unconfirmed_tx {unconfirmed_tx}")
         removal_dict: Dict[bytes32, Coin] = {}
         for tx in unconfirmed_tx:
             for coin in tx.removals:

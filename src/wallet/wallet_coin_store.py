@@ -226,6 +226,7 @@ class WalletCoinStore:
             coins.add(
                 WalletCoinRecord(coin, row[1], row[2], row[3], row[4], row[5], row[6], WalletType(row[10]), row[11])
             )
+
         return coins
 
     # Checks DB and DiffStores for CoinRecords with puzzle_hash and returns them
