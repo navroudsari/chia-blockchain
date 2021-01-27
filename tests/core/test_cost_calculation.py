@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+import logging
 import pytest
 
 from src.consensus.cost_calculator import calculate_cost_of_program, CostResult
@@ -15,6 +16,7 @@ from tests.setup_nodes import test_constants, bt
 from clvm_tools import binutils
 
 BURN_PUZZLE_HASH = b"0" * 32
+log = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
@@ -112,7 +114,8 @@ class TestCostCalculation:
         assert err is None
         assert len(npc) == 687
         # TODO make this instant
-        assert duration < 120
+        log.info(f"Time to evaluate test_tx_generator_speed: {duration}")
+        assert duration < 240
 
     @pytest.mark.asyncio
     async def test_standard_tx(self):
